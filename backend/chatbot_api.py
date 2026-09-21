@@ -31,6 +31,7 @@ from qdrant_client import QdrantClient
 from sentence_transformers import SentenceTransformer
 from difflib import get_close_matches
 from local_orchestrator import LocalOrchestrator
+from local_generator import LocalGenerator
 
 
 GLOBAL_HISTORY = []
@@ -262,6 +263,7 @@ QDRANT_COLLECTION = "rammy_hr"
 EMBED_MODEL       = "all-MiniLM-L6-v2"
 QDRANT_TOP_K      = 5   # number of chunks to retrieve per query
 _orchestrator = LocalOrchestrator()
+_generator = LocalGenerator()
 
 PII_WARNING_REPLY = (
     "For your privacy, please do not include personal information in chat. "
@@ -1014,15 +1016,8 @@ def ask_model(
                     + trimmed_history
                     + [{"role": "user", "content": question}]
                 )
-                response = client.chat.completions.create(
-                    model=MODEL,
-                    messages=messages,
-                    max_tokens=300,
-                    temperature=0.3,
-                )
-                answer = response.choices[0].message.content.strip()
+                answer = generator = generator.generate(messages)
                 if answer and "OUTOFSCOPE" not in answer:
-                    _tokens = _extract_tokens(response)
                     return answer, _tokens
         # No history or no context found -- treat as small talk
         kind = "greeting"
@@ -1062,16 +1057,7 @@ def ask_model(
             + [{"role": "user", "content": question}]
         )
 
-    # -- FIX: use chat.completions.create (not client.responses.create) --
-    response = client.chat.completions.create(
-        model=MODEL,
-        messages=messages,
-        max_tokens=300,
-        temperature=0.3,   # Lower temp = more consistent, factual replies
-    )
-
-    _tokens = _extract_tokens(response)
-    answer = response.choices[0].message.content.strip()
+    answer = _generator.generate(messages)
     answer = linkify_contacts(answer)
 
     # If GPT returned the out-of-scope sentinel, generate a friendly decline
