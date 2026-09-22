@@ -1016,7 +1016,7 @@ def ask_model(
                     + trimmed_history
                     + [{"role": "user", "content": question}]
                 )
-                answer = generator = generator.generate(messages)
+                answer = _generator.generate(messages)
                 if answer and "OUTOFSCOPE" not in answer:
                     return answer, _tokens
         # No history or no context found -- treat as small talk
