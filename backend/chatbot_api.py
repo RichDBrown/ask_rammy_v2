@@ -30,6 +30,7 @@ from urllib.parse import quote
 from qdrant_client import QdrantClient
 from sentence_transformers import SentenceTransformer
 from difflib import get_close_matches
+from local_orchestrator import LocalOrchestrator
 
 
 GLOBAL_HISTORY = []
@@ -260,6 +261,7 @@ QDRANT_PORT       = int(os.getenv("QDRANT_PORT", "6333"))
 QDRANT_COLLECTION = "rammy_hr"
 EMBED_MODEL       = "all-MiniLM-L6-v2"
 QDRANT_TOP_K      = 5   # number of chunks to retrieve per query
+_orchestrator = LocalOrchestrator()
 
 PII_WARNING_REPLY = (
     "For your privacy, please do not include personal information in chat. "
@@ -1032,7 +1034,8 @@ def ask_model(
             {"role": "user",   "content": question},
         ]
     else:
-        context = build_context(question, chunks)
+        retrieval_query = _orchestrator.decide(question, history).query
+        context = build_context(retrieval_query, chunks)
         if not context:
             # Generate a friendly, varied decline via GPT
             oos_prompt = build_out_of_scope_prompt(question)

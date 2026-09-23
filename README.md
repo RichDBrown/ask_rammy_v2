@@ -103,7 +103,7 @@ git clone https://github.com/GarrettCrowner/CSC402-Project.git
 cd CSC402-Project
 ```
 
-### 2. Create your `.env` file
+### 2. Create your `docker/.env` file
 
 ```bash
 echo 'OPENAI_API_KEY=sk-your-actual-key-here
@@ -111,7 +111,7 @@ OPENAI_ORG_ID=
 OPENAI_PROJECT_ID=
 MINIO_USER=minioadmin
 MINIO_PASS=minioadmin
-MINIO_BUCKET=documents' > .env
+MINIO_BUCKET=documents' > docker/.env
 ```
 
 Replace `sk-your-actual-key-here` with your real OpenAI API key.
@@ -125,8 +125,18 @@ Open Docker Desktop and wait for the whale icon to stop animating.
 ### 4. Build and start all services
 
 ```bash
-docker-compose up --build -d
+cd docker
+docker compose up --build -d
 ```
+
+On first startup, download the local model into the persistent Ollama volume:
+
+```bash
+docker compose exec ollama ollama pull llama3.2:3b
+```
+
+Team members do not need Ollama installed on their host. Docker Desktop runs
+Ollama and the rest of the application services.
 
 > ⏱️ **The first build takes 15–25 minutes.** Docker downloads large ML dependencies including PyTorch (~800 MB) and sentence-transformers. Subsequent `docker-compose up` runs take under 30 seconds.
 
@@ -135,7 +145,7 @@ docker-compose up --build -d
 Fetches all WCU/PASSHE HR web sources and any PDFs in MinIO, chunks and embeds them, and uploads to Qdrant. Run once after the first build — and again whenever sources or PDFs change.
 
 ```bash
-docker exec rammy-python python qdrant_setup.py
+docker compose exec python python qdrant_setup.py
 ```
 
 Expected output:
@@ -154,12 +164,14 @@ Open `frontend/embed.html` in your browser, or right-click it in VS Code and sel
 
 **Start the app:**
 ```bash
-docker-compose up
+cd docker
+docker compose up -d
 ```
 
 **Shut down:**
 ```bash
-docker-compose down
+cd docker
+docker compose down
 ```
 
 > Qdrant and MinIO data persist in named Docker volumes — you do **not** need to re-run `qdrant_setup.py` on every restart.
