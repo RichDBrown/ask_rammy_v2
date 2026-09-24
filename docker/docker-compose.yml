@@ -92,11 +92,9 @@ services:
             # PDF_PROXY_BASE is the browser-accessible URL for the Node PDF proxy.
             # Override this in .env when deploying (e.g. https://your-domain.com/api/pdf).
             - PDF_PROXY_BASE=${PDF_PROXY_BASE:-http://localhost:3000/api/pdf}
-            # Optional local model used only to rewrite retrieval queries.
-            - LOCAL_ORCHESTRATOR_ENABLED=${LOCAL_ORCHESTRATOR_ENABLED:-true}
             - LOCAL_MODEL_BASE_URL=${LOCAL_MODEL_BASE_URL:-http://ollama:11434}
             - LOCAL_MODEL=${LOCAL_MODEL:-llama3.2:3b}
-            - LOCAL_MODEL_TIMEOUT=${LOCAL_MODEL_TIMEOUT:-4}
+            - LOCAL_MODEL_TIMEOUT=${LOCAL_MODEL_TIMEOUT:-10}
         ports:
             - "5001:5001"
         depends_on:

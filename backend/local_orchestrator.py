@@ -1,8 +1,7 @@
-"""Optional local query-orchestration layer for the RAG backend.
+"""Local query-orchestration layer for the RAG backend.
 
-The local model is used for query planning only. Answer generation remains
-owned by the configured answer model, so disabling this layer preserves the
-existing chatbot behavior.
+The local model is always used for query planning when a question is present.
+Answer generation remains owned by the configured answer model.
 """
 
 import os
@@ -21,28 +20,24 @@ class OrchestrationDecision:
 class LocalOrchestrator:
     """Use an Ollama-compatible local model to plan a RAG query.
 
-    The network call is deliberately optional and bounded. Any local model
-    failure returns the user's original text so the cloud-backed RAG path can
-    continue serving requests.
+    The network call is bounded. Any local model failure returns the user's
+    original text so the RAG path can continue serving requests.
     """
 
     def __init__(
         self,
-        enabled: Optional[bool] = None,
         base_url: Optional[str] = None,
         model: Optional[str] = None,
         timeout: Optional[float] = None,
     ) -> None:
-        configured = os.getenv("LOCAL_ORCHESTRATOR_ENABLED", "false").lower()
-        self.enabled = enabled if enabled is not None else configured in {"1", "true", "yes", "on"}
-        self.base_url = (base_url or os.getenv("LOCAL_MODEL_BASE_URL", "http://host.docker.internal:11434")).rstrip("/")
+        self.base_url = (base_url or os.getenv("LOCAL_MODEL_BASE_URL", "http://ollama:11434")).rstrip("/")
         self.model = model or os.getenv("LOCAL_MODEL", "llama3.2:3b")
-        self.timeout = timeout if timeout is not None else float(os.getenv("LOCAL_MODEL_TIMEOUT", "4"))
+        self.timeout = timeout if timeout is not None else float(os.getenv("LOCAL_MODEL_TIMEOUT", "10"))
 
     def decide(self, question: str, history: Optional[List[Dict[str, Any]]] = None) -> OrchestrationDecision:
         """Return a standalone retrieval query without blocking the fallback path."""
         original = (question or "").strip()
-        if not original or not self.enabled:
+        if not original:
             return OrchestrationDecision(original, "original")
 
         prompt = self._planning_prompt(original, history or [])
