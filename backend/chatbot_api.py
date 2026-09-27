@@ -31,6 +31,7 @@ from qdrant_client import QdrantClient
 from sentence_transformers import SentenceTransformer
 from difflib import get_close_matches
 from local_orchestrator import LocalOrchestrator
+from local_generation import LocalGenerator
 
 
 GLOBAL_HISTORY = []
@@ -106,6 +107,7 @@ INTENT_PHRASES = {
 OPENAI_API_KEY   = os.getenv("OPENAI_API_KEY", "")
 OPENAI_ORG_ID    = os.getenv("OPENAI_ORG_ID", "")
 OPENAI_PROJECT_ID = os.getenv("OPENAI_PROJECT_ID", "")
+GENERATION_PROVIDER = os.getenv("GENERATION_PROVIDER", "proprietary").strip().lower()
 
 MODEL = "gpt-4.1-mini"
 
@@ -262,6 +264,7 @@ QDRANT_COLLECTION = "rammy_hr"
 EMBED_MODEL       = "all-MiniLM-L6-v2"
 QDRANT_TOP_K      = 5   # number of chunks to retrieve per query
 _orchestrator = LocalOrchestrator()
+_generator = LocalGenerator()
 
 PII_WARNING_REPLY = (
     "For your privacy, please do not include personal information in chat. "
@@ -1014,15 +1017,25 @@ def ask_model(
                     + trimmed_history
                     + [{"role": "user", "content": question}]
                 )
-                response = client.chat.completions.create(
-                    model=MODEL,
-                    messages=messages,
-                    max_tokens=300,
-                    temperature=0.3,
-                )
-                answer = response.choices[0].message.content.strip()
-                if answer and "OUTOFSCOPE" not in answer:
+                if GENERATION_PROVIDER == "local":
+                    answer, _tokens = _generator.generate(
+                        messages=messages,
+                        max_tokens=300,
+                        temperature=0.3,
+                    )
+                else:
+                    response = client.chat.completions.create(
+                        model=MODEL,
+                        messages=messages,
+                        max_tokens=300,
+                        temperature=0.3,
+                    )
+                    answer = response.choices[0].message.content or ""
                     _tokens = _extract_tokens(response)
+
+                answer = answer.strip()
+
+                if answer and "OUTOFSCOPE" not in answer:
                     return answer, _tokens
         # No history or no context found -- treat as small talk
         kind = "greeting"
@@ -1037,16 +1050,26 @@ def ask_model(
         retrieval_query = _orchestrator.decide(question, history).query
         context = build_context(retrieval_query, chunks)
         if not context:
-            # Generate a friendly, varied decline via GPT
+            # Generate a friendly, varied decline with the selected provider.
             oos_prompt = build_out_of_scope_prompt(question)
-            oos_response = client.chat.completions.create(
-                model=MODEL,
-                messages=[{"role": "user", "content": oos_prompt}],
-                max_tokens=100,
-                temperature=0.8,  # Higher temp for natural variation
-            )
-            _tokens = _extract_tokens(oos_response)
-            return linkify_contacts(oos_response.choices[0].message.content.strip() or OUT_OF_SCOPE_REPLY), _tokens
+
+            if GENERATION_PROVIDER == "local":
+                answer, _tokens = _generator.generate(
+                    messages=[{"role": "user", "content": oos_prompt}],
+                    max_tokens=100,
+                    temperature=0.8,
+                )
+            else:
+                oos_response = client.chat.completions.create(
+                    model=MODEL,
+                    messages=[{"role": "user", "content": oos_prompt}],
+                    max_tokens=100,
+                    temperature=0.8,  # Higher temp for natural variation
+                )
+                answer = oos_response.choices[0].message.content or ""
+                _tokens = _extract_tokens(oos_response)
+            
+            return linkify_contacts(answer.strip() or OUT_OF_SCOPE_REPLY), _tokens
 
         system_prompt = build_hr_instructions(context)
         # Strip any leading assistant messages -- OpenAI requires history to
@@ -1062,30 +1085,50 @@ def ask_model(
             + [{"role": "user", "content": question}]
         )
 
+    if GENERATION_PROVIDER == "local":
+        answer, _tokens = _generator.generate(
+            messages=messages,
+            max_tokens=300,
+            temperature=0.3,
+        )
+    else:
     # -- FIX: use chat.completions.create (not client.responses.create) --
-    response = client.chat.completions.create(
-        model=MODEL,
-        messages=messages,
-        max_tokens=300,
-        temperature=0.3,   # Lower temp = more consistent, factual replies
-    )
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=messages,
+            max_tokens=300,
+            temperature=0.3,   # Lower temp = more consistent, factual replies
+        )
 
-    _tokens = _extract_tokens(response)
-    answer = response.choices[0].message.content.strip()
+        _tokens = _extract_tokens(response)
+        answer = response.choices[0].message.content.strip()
     answer = linkify_contacts(answer)
 
-    # If GPT returned the out-of-scope sentinel, generate a friendly decline
+    # If the selected model returned the out-of-scope sentinel, generate a friendly decline.
     if not answer or "OUTOFSCOPE" in answer:
         oos_prompt = build_out_of_scope_prompt(question)
-        oos_response = client.chat.completions.create(
-            model=MODEL,
-            messages=[{"role": "user", "content": oos_prompt}],
-            max_tokens=100,
-            temperature=0.8,
-        )
-        t2 = _extract_tokens(oos_response)
-        _tokens = {k: _tokens[k] + t2[k] for k in _tokens}
-        return linkify_contacts(oos_response.choices[0].message.content.strip() or OUT_OF_SCOPE_REPLY), _tokens
+
+        if GENERATION_PROVIDER == "local":
+            fallback_answer, fallback_tokens = _generator.generate(
+                messages=[{"role": "user", "content": oos_prompt}],
+                max_tokens=100,
+                temperature=0.8,
+            )
+        else:
+            oos_response = client.chat.completions.create(
+                model=MODEL,
+                messages=[{"role": "user", "content": oos_prompt}],
+                max_tokens=100,
+                temperature=0.8,
+            )
+            fallback_answer = oos_response.choices[0].message.content or ""
+            fallback_tokens = _extract_tokens(oos_response)
+        _tokens = {
+            key: _tokens[key] + fallback_tokens[key]
+            for key in _tokens
+        }
+        
+        return linkify_contacts(fallback_answer.strip() or OUT_OF_SCOPE_REPLY), _tokens
 
     return answer, _tokens
 
@@ -1178,10 +1221,11 @@ def _ensure_startup():
     if _startup_done:
         return
     _startup_done = True
-    if OPENAI_API_KEY:
-        _client = _init_client()
-    else:
-        print("[startup] WARNING: OPENAI_API_KEY not set.")
+    if GENERATION_PROVIDER != "local":
+        if OPENAI_API_KEY:
+            _client = _init_client()
+        else:
+            print("[startup] WARNING: OPENAI_API_KEY not set.")
     _init_qdrant()
 
 
@@ -1441,10 +1485,10 @@ def analytics():
 # --- Entry Point --------------------------------------------------------------
 
 if __name__ == "__main__":
-    if not OPENAI_API_KEY:
-        raise RuntimeError("Set OPENAI_API_KEY environment variable before starting.")
-
-    _client = _init_client()
+    if GENERATION_PROVIDER != "local":
+        if not OPENAI_API_KEY:
+            raise RuntimeError("Set OPENAI_API_KEY environment variable before starting.")
+        _client = _init_client()
     _init_qdrant()       # Connect to Qdrant and load embedding model
     _startup_done = True # Prevent before_request from running init a second time
 
