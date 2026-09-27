@@ -32,7 +32,7 @@ class LocalOrchestrator:
     ) -> None:
         self.base_url = (base_url or os.getenv("LOCAL_MODEL_BASE_URL", "http://ollama:11434")).rstrip("/")
         self.model = model or os.getenv("LOCAL_MODEL", "llama3.2:3b")
-        self.timeout = timeout if timeout is not None else float(os.getenv("LOCAL_MODEL_TIMEOUT", "10"))
+        self.timeout = timeout if timeout is not None else float(os.getenv("LOCAL_ORCHESTRATION_TIMEOUT", "30"))
 
     def decide(self, question: str, history: Optional[List[Dict[str, Any]]] = None) -> OrchestrationDecision:
         """Return a standalone retrieval query without blocking the fallback path."""

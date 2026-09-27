@@ -101,7 +101,7 @@ app.post("/api/chat", validateChatPayload, async (req, res) => {
     const response = await axios.post(
       `${PYTHON_BASE_URL}/chat`,
       { message, history: trimmedHistory },
-      { timeout: 120000 } // 120 s — local Ollama generation can be much slower than OpenAI
+      { timeout: 240000 } // 240 s — CPU-only local Ollama inference can be slow, especially on cold start
     );
 
     return res.json({ reply: response.data.reply });

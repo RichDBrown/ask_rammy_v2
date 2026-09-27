@@ -1047,7 +1047,9 @@ def ask_model(
             {"role": "user",   "content": question},
         ]
     else:
-        retrieval_query = _orchestrator.decide(question, history).query
+        decision = _orchestrator.decide(question, history)
+        print(f"[orchestrator] source={decision.source} query={decision.query!r}")
+        retrieval_query = decision.query
         context = build_context(retrieval_query, chunks)
         if not context:
             # Generate a friendly, varied decline with the selected provider.

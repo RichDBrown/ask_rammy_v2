@@ -9,6 +9,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf 
 # Set working directory inside the container
 WORKDIR /app
 
+# Flush stdout/stderr immediately so print() output reaches `docker compose logs`
+ENV PYTHONUNBUFFERED=1
+
 # Copy and install dependencies first (leverages Docker layer caching)
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt

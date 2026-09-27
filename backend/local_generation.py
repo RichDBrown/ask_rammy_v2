@@ -20,7 +20,7 @@ class LocalGenerator:
         ).rstrip("/")
         self.model = model or os.getenv("LOCAL_MODEL", "llama3.2:3b")
         self.timeout = timeout if timeout is not None else float(
-            os.getenv("LOCAL_GENERATION_TIMEOUT", "60")
+            os.getenv("LOCAL_GENERATION_TIMEOUT", "180")
         )
 
     def generate(
