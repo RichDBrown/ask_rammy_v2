@@ -61,7 +61,7 @@ Browser (frontend/embed.html + chat.js)
                   │                         │
                   ▼                         ▼
             Qdrant Vector DB      Answer generation
-              (port 6333)         OpenAI or Ollama
+              (port 6333)         OpenAI or Ollama (port 11434)
               semantic retrieval  (provider setting)
                   ▲
                   │
@@ -82,6 +82,7 @@ Browser (frontend/embed.html + chat.js)
 | Node.js (Express) | 3000 | API gateway, rate limiting, PDF proxy |
 | Python (Flask) | 5001 | Chatbot logic, vector search, LLM calls |
 | Qdrant | 6333 | Vector database — semantic retrieval |
+| Ollama | 11434 | Local model server for query orchestration and local answer generation |
 | MinIO | 9000 / 9001 | PDF object storage / web console |
 
 ---
@@ -370,8 +371,9 @@ PDF sources are managed separately via the MinIO console.
 | Frontend | Vanilla JS, HTML/CSS |
 | API Gateway | Node.js + Express |
 | Chatbot Backend | Python + Flask |
+| Query Orchestration | Ollama |
 | Vector Search | Qdrant + sentence-transformers (`all-MiniLM-L6-v2`) |
-| LLM | OpenAI GPT-4.1-mini |
+| LLM | OpenAI GPT-4.1-mini or Ollama local model, selected by `GENERATION_PROVIDER` |
 | PDF Storage | MinIO (S3-compatible) |
 | Containerization | Docker + Docker Compose |
 
