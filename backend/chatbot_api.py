@@ -509,7 +509,7 @@ def build_context(question: str, chunks: object = None) -> str:
         # Resolve pdf: labels -> real browser-accessible URLs via the Node proxy
         resolved_url = pdf_label_to_url(raw_url) if raw_url.startswith("pdf:") else raw_url
         is_pdf = raw_url.startswith("pdf:")
-        selected.append({"url": resolved_url, "text": r.payload.get("text", ""), "raw_url": raw_url, "is_pdf": is_pdf})
+        selected.append({"url": resolved_url, "text": r.payload.get("text", ""), "raw_url": raw_url, "is_pdf": is_pdf, "score": r.score})
 
     if not selected:
         return ""
@@ -519,6 +519,11 @@ def build_context(question: str, chunks: object = None) -> str:
     has_web = any(not c["is_pdf"] for c in selected)
     if has_web:
         selected.sort(key=lambda c: (1 if c["is_pdf"] else 0))
+
+    print(f"[retrieval] query={question!r} -> {len(selected)} chunks")
+    for i, c in enumerate(selected, 1):
+        snippet = c["text"].replace("\n", " ")
+        print(f"  [{i}] score={c['score']:.3f} url={c['raw_url']}\n      {snippet}")
 
     seen_urls: List[str] = []
     for c in selected:
