@@ -236,6 +236,9 @@ def detect_source_type(reply: str) -> str:
 
 def log_interaction(question: str, reply: str, is_out_of_scope: bool, tokens: dict = None) -> None:
     """Append one JSONL record to the analytics log file."""
+    # Only OpenAI usage is tracked; local model tokens are omitted from analytics.
+    if GENERATION_PROVIDER == "local":
+        tokens = None
     record = {
         "ts":             datetime.now(timezone.utc).isoformat(),
         "question":       question,
@@ -1048,7 +1051,7 @@ def ask_model(
         ]
     else:
         decision = _orchestrator.decide(question, history)
-        print(f"[orchestrator] source={decision.source} query={decision.query!r}")
+        print(f"[orchestrator] source={decision.source} query={decision.query}")
         retrieval_query = decision.query
         context = build_context(retrieval_query, chunks)
         if not context:
