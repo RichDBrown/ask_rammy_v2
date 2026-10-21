@@ -5,6 +5,7 @@ Answer generation remains owned by the configured answer model.
 """
 
 import os
+import re
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
@@ -57,8 +58,12 @@ class LocalOrchestrator:
                         {
                             "role": "system",
                             "content": (
-                                "Rewrite the user's message as one concise standalone HR knowledge-base "
-                                "search query. Output only the query, with no quotes or explanation."
+                                "Rewrite the current message as one concise, standalone HR knowledge-base "
+                                "search query. If it refers to earlier turns (e.g. 'it', 'that', 'what about "
+                                "part-time?', 'yes'), use the conversation to name the specific topic and "
+                                "details. Keep the user's intent and include only facts stated in the "
+                                "conversation. If the message is already standalone, change it as little as "
+                                "possible. Output only the query, with no quotes or explanation."
                             ),
                         },
                         {"role": "user", "content": prompt},
@@ -78,11 +83,27 @@ class LocalOrchestrator:
         return OrchestrationDecision(original, "fallback")
 
     @staticmethod
-    def _planning_prompt(question: str, history: List[Dict[str, Any]]) -> str:
-        recent = [
-            f"{item.get('role', 'user')}: {item.get('content', '')}"
-            for item in history[-4:]
-            if isinstance(item, dict) and item.get("content")
-        ]
+    def _clean_turn(role: str, content: str) -> str:
+        text = str(content).split("(regarding:", 1)[0]
+        if role == "assistant":
+            text = re.sub(r"\[OPTIONS:[^\]]*\]", " ", text)
+            text = re.sub(r"<[^>]+>", " ", text)
+        text = " ".join(text.split())
+        return text[:300] if role == "assistant" else text[:500]
+
+    @classmethod
+    def _planning_prompt(cls, question: str, history: List[Dict[str, Any]]) -> str:
+        turns = [item for item in history if isinstance(item, dict) and item.get("content")]
+        # The frontend appends the current message to history before sending.
+        if turns and turns[-1].get("role") == "user" and cls._clean_turn("user", turns[-1]["content"]) == cls._clean_turn("user", question):
+            turns = turns[:-1]
+
+        recent = []
+        for item in turns[-6:]:
+            role = item.get("role", "user")
+            text = cls._clean_turn(role, item["content"])
+            if text:
+                recent.append(f"{role}: {text}")
+                
         context = "\n".join(recent)
         return f"Conversation:\n{context}\n\nCurrent message:\n{question}" if context else question
