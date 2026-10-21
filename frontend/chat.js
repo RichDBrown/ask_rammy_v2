@@ -677,7 +677,7 @@ function createDropdown() {
 }
 
 // ─── Wire Buttons ─────────────────────────────────────────────────────────────
-window.addEventListener("load", () => {
+function initChat() {
     // Force container hidden and button visible
     forceHide();
     const btn = document.getElementById("chat-btn");
@@ -696,4 +696,10 @@ window.addEventListener("load", () => {
 
     checkStatus();
     setInterval(checkStatus, 30000);
-});
+}
+// Don't wait for external assets (university CSS, GTM, fonts) that may hang
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initChat);
+} else {
+    initChat();
+}
