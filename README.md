@@ -141,11 +141,16 @@ docker compose up --build -d
 On first startup, download the local model into the persistent Ollama volume:
 
 ```bash
-docker compose exec ollama ollama pull llama3.2:3b
+docker compose exec ollama ollama pull llama3.2-vision:11b
 ```
 
 Team members do not need Ollama installed on their host. Docker Desktop runs
 Ollama and the rest of the application services.
+
+The Ollama image is pinned to version `0.24.0` because later Ollama releases
+do not support the `mllama` architecture used by `llama3.2-vision:11b`.
+Docker Desktop must be allocated at least 12 GiB of memory for this model;
+16 GiB is recommended.
 
 > ⏱️ **The first build takes 15–25 minutes.** Docker downloads large ML dependencies including PyTorch (~800 MB) and sentence-transformers. Subsequent `docker-compose up` runs take under 30 seconds.
 

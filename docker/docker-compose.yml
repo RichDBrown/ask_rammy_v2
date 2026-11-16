@@ -60,7 +60,9 @@ services:
     # ── Local Ollama Model Server ─────────────────────────────────────────────
     # The model is stored in a named volume and is pulled once after startup.
     ollama:
-        image: ollama/ollama:latest
+        # Ollama 0.30+ does not support the mllama architecture used by
+        # llama3.2-vision:11b. Keep this pinned until that support returns.
+        image: ollama/ollama:0.24.0
         container_name: rammy-ollama
         ports:
             - "11434:11434"
@@ -93,9 +95,9 @@ services:
             # Override this in .env when deploying (e.g. https://your-domain.com/api/pdf).
             - PDF_PROXY_BASE=${PDF_PROXY_BASE:-http://localhost:3000/api/pdf}
             - LOCAL_MODEL_BASE_URL=${LOCAL_MODEL_BASE_URL:-http://ollama:11434}
-            - LOCAL_MODEL=${LOCAL_MODEL:-llama3.2:3b}
-            - LOCAL_ORCHESTRATION_TIMEOUT=${LOCAL_ORCHESTRATION_TIMEOUT:-30}
-            - LOCAL_GENERATION_TIMEOUT=${LOCAL_GENERATION_TIMEOUT:-180}
+            - LOCAL_MODEL=${LOCAL_MODEL:-llama3.2-vision:11b}
+            - LOCAL_ORCHESTRATION_TIMEOUT=${LOCAL_ORCHESTRATION_TIMEOUT:-180}
+            - LOCAL_GENERATION_TIMEOUT=${LOCAL_GENERATION_TIMEOUT:-900}
             - GENERATION_PROVIDER=${GENERATION_PROVIDER:-proprietary}
         ports:
             - "5001:5001"
